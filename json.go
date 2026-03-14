@@ -17,12 +17,12 @@ package forms
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -396,7 +396,7 @@ func (form *Form) parseElement(model interface{}, ele *config.Element, typ refle
 
 	OUTLOOP:
 		if isValid {
-			sv = fmt.Sprintf("%v", value.Interface())
+			sv = com.String(value.Interface())
 		}
 	}
 	isStruct := typ != nil && typ.Kind() == reflect.Struct
@@ -515,14 +515,25 @@ func (form *Form) parseElement(model interface{}, ele *config.Element, typ refle
 	case common.CHECKBOX, common.RADIO:
 		choices := []fields.InputChoice{}
 		hasSet := len(sv) > 0
+		value := ele.Value
+		if hasSet {
+			value = sv
+		}
+		var checkedValues []string
+		if ele.Type == common.CHECKBOX {
+			checkedValues = parseCheckedValue(value)
+		} else if len(value) > 0 {
+			checkedValues = []string{value}
+		}
+		hasChecked := len(checkedValues) > 0
 		for _, v := range ele.Choices {
 			if v.Checked {
-				if hasSet && sv != v.Option[0] {
+				if hasChecked && !slices.Contains(checkedValues, v.Option[0]) {
 					v.Checked = false
 				}
 			} else {
-				if hasSet {
-					v.Checked = sv == v.Option[0]
+				if hasChecked {
+					v.Checked = slices.Contains(checkedValues, v.Option[0])
 				}
 			}
 			ic := fields.InputChoice{
@@ -562,17 +573,35 @@ func (form *Form) parseElement(model interface{}, ele *config.Element, typ refle
 	case common.SELECT:
 		choices := map[string][]fields.InputChoice{}
 		hasSet := len(sv) > 0
+		value := ele.Value
+		if hasSet {
+			value = sv
+		}
+		var multiple bool
+		for _, v := range ele.Attributes {
+			if len(v) > 0 && v[0] == `multiple` {
+				multiple = true
+				break
+			}
+		}
+		var selectedValues []string
+		if multiple {
+			selectedValues = parseCheckedValue(value)
+		} else if len(value) > 0 {
+			selectedValues = []string{value}
+		}
+		hasSelected := len(selectedValues) > 0
 		for _, v := range ele.Choices {
 			if _, ok := choices[v.Group]; !ok {
 				choices[v.Group] = []fields.InputChoice{}
 			}
 			if v.Checked {
-				if hasSet && sv != v.Option[0] {
+				if hasSelected && !slices.Contains(selectedValues, v.Option[0]) {
 					v.Checked = false
 				}
 			} else {
-				if hasSet {
-					v.Checked = sv == v.Option[0]
+				if hasSelected {
+					v.Checked = slices.Contains(selectedValues, v.Option[0])
 				}
 			}
 			ic := fields.InputChoice{
@@ -641,7 +670,7 @@ func (form *Form) validElement(ele *config.Element, _ reflect.Type, val reflect.
 		}
 	}
 	if isValid {
-		sv := fmt.Sprintf("%v", value.Interface())
+		sv := com.String(value.Interface())
 		isValid = form.valid.ValidField(ele.Name, sv, ele.Valid)
 	}
 	return isValid
