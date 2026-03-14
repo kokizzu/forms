@@ -409,7 +409,16 @@ func (f *Field) SingleChoice() FieldInterface {
 func (f *Field) AddSelected(opt ...string) FieldInterface {
 	switch f.Type {
 	case common.SELECT:
-		for _, v := range opt {
+		var selectedValues []string
+		if f.isMultiple() {
+			selectedValues = f.parseCheckedValue(opt)
+		} else {
+			selectedValues = opt
+		}
+		if len(selectedValues) == 0 {
+			return f
+		}
+		for _, v := range selectedValues {
 			i, ok := f.ChoiceKeys[v]
 			if !ok {
 				continue
@@ -422,9 +431,13 @@ func (f *Field) AddSelected(opt ...string) FieldInterface {
 			}
 		}
 	case common.RADIO, common.CHECKBOX:
+		checkedValues := f.parseCheckedValue(opt)
+		if len(checkedValues) == 0 {
+			return f
+		}
 		choice := f.Choices.([]InputChoice)
 		size := len(choice)
-		for _, v := range opt {
+		for _, v := range checkedValues {
 			i, ok := f.ChoiceKeys[v]
 			if !ok {
 				continue
@@ -437,25 +450,63 @@ func (f *Field) AddSelected(opt ...string) FieldInterface {
 	return f
 }
 
+func (f *Field) parseCheckedValue(opt []string) []string {
+	var checkedValues []string
+	if len(opt) == 1 {
+		value := opt[0]
+		if f.Type == common.CHECKBOX {
+			checkedValues = common.ParseCheckedValue(value)
+		} else if len(value) > 0 {
+			checkedValues = []string{value}
+		}
+	} else {
+		checkedValues = opt
+	}
+	return checkedValues
+}
+
+func (f *Field) isMultiple() bool {
+	if f.Params != nil {
+		_, ok := f.Params[`multiple`]
+		if ok {
+			return true
+		}
+	}
+	return slices.Contains(f.Tags, `multiple`)
+}
+
 func (f *Field) SetSelected(opt ...string) FieldInterface {
 	switch f.Type {
 	case common.SELECT:
+		var selectedValues []string
+		if f.isMultiple() {
+			selectedValues = f.parseCheckedValue(opt)
+		} else {
+			selectedValues = opt
+		}
+		if len(selectedValues) == 0 {
+			return f
+		}
 		choice := f.Choices.(map[string][]InputChoice)
 		for key, i := range f.ChoiceKeys {
 			vc, ok := choice[i.Group]
 			if !ok || len(vc) <= i.Index {
 				continue
 			}
-			choice[i.Group][i.Index].Checked = slices.Contains(opt, key)
+			choice[i.Group][i.Index].Checked = slices.Contains(selectedValues, key)
 		}
 	case common.RADIO, common.CHECKBOX:
+		checkedValues := f.parseCheckedValue(opt)
+		if len(checkedValues) == 0 {
+			return f
+		}
 		choice := f.Choices.([]InputChoice)
 		size := len(choice)
 		for key, i := range f.ChoiceKeys {
 			if size <= i.Index {
 				continue
 			}
-			choice[i.Index].Checked = slices.Contains(opt, key)
+			choice[i.Index].Checked = slices.Contains(checkedValues, key)
 		}
 	}
 	return f

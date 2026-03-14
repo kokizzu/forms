@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -513,42 +512,20 @@ func (form *Form) parseElement(model interface{}, ele *config.Element, typ refle
 		}
 
 	case common.CHECKBOX, common.RADIO:
-		choices := []fields.InputChoice{}
-		hasSet := len(sv) > 0
-		value := ele.Value
-		if hasSet {
-			value = sv
-		}
-		var checkedValues []string
-		if ele.Type == common.CHECKBOX {
-			checkedValues = parseCheckedValue(value)
-		} else if len(value) > 0 {
-			checkedValues = []string{value}
-		}
-		hasChecked := len(checkedValues) > 0
-		for _, v := range ele.Choices {
-			if v.Checked {
-				if hasChecked && !slices.Contains(checkedValues, v.Option[0]) {
-					v.Checked = false
-				}
-			} else {
-				if hasChecked {
-					v.Checked = slices.Contains(checkedValues, v.Option[0])
-				}
-			}
-			ic := fields.InputChoice{
+		choices := make([]fields.InputChoice, len(ele.Choices))
+		for i, v := range ele.Choices {
+			choices[i] = fields.InputChoice{
 				ID:      v.Option[0],
 				Val:     form.labelFn(v.Option[1]),
 				Checked: v.Checked,
 			}
-			choices = append(choices, ic)
 		}
 		if ele.Type == common.CHECKBOX {
 			f = fields.CheckboxField(ele.Name, choices)
 		} else {
 			f = fields.RadioField(ele.Name, choices)
 		}
-		if !hasSet {
+		if len(sv) == 0 {
 			f.SetValue(ele.Value)
 		} else {
 			f.SetValue(sv)
@@ -572,37 +549,9 @@ func (form *Form) parseElement(model interface{}, ele *config.Element, typ refle
 
 	case common.SELECT:
 		choices := map[string][]fields.InputChoice{}
-		hasSet := len(sv) > 0
-		value := ele.Value
-		if hasSet {
-			value = sv
-		}
-		var multiple bool
-		for _, v := range ele.Attributes {
-			if len(v) > 0 && v[0] == `multiple` {
-				multiple = true
-				break
-			}
-		}
-		var selectedValues []string
-		if multiple {
-			selectedValues = parseCheckedValue(value)
-		} else if len(value) > 0 {
-			selectedValues = []string{value}
-		}
-		hasSelected := len(selectedValues) > 0
 		for _, v := range ele.Choices {
 			if _, ok := choices[v.Group]; !ok {
 				choices[v.Group] = []fields.InputChoice{}
-			}
-			if v.Checked {
-				if hasSelected && !slices.Contains(selectedValues, v.Option[0]) {
-					v.Checked = false
-				}
-			} else {
-				if hasSelected {
-					v.Checked = slices.Contains(selectedValues, v.Option[0])
-				}
 			}
 			ic := fields.InputChoice{
 				ID:      v.Option[0],
@@ -612,7 +561,7 @@ func (form *Form) parseElement(model interface{}, ele *config.Element, typ refle
 			choices[v.Group] = append(choices[v.Group], ic)
 		}
 		f = fields.SelectField(ele.Name, choices)
-		if !hasSet {
+		if len(sv) == 0 {
 			f.SetValue(ele.Value)
 		} else {
 			f.SetValue(sv)
