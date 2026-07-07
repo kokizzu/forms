@@ -329,6 +329,14 @@ func (f *FieldSetType) MultilingualField(lang string, names ...string) fields.Fi
 	}
 	ind, ok := f.fieldMap[names[0]]
 	if !ok {
+		for _, field := range f.FieldList {
+			if mlt, ok := field.(config.MultilingualInterface); ok {
+				f := mlt.MultilingualField(lang, names...)
+				if len(f.Name()) > 0 {
+					return f
+				}
+			}
+		}
 		return &fields.Field{}
 	}
 	switch v := f.FieldList[ind].(type) {

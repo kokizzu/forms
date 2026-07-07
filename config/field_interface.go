@@ -51,3 +51,7 @@ type FieldInterface interface {
 	Element() *Element
 	ElementType() string
 }
+
+type MultilingualInterface interface {
+	MultilingualField(lang string, names ...string) FieldInterface
+}
